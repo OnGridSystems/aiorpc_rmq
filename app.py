@@ -1,21 +1,22 @@
 import asyncio
 
-from aiorpc import RPC, init_rmq
+from aiorpc import RMQ
+
+microservice = RMQ(request_queue='test', response_queue='end')
 
 
-@RPC('end')
+@microservice.RPC
 async def foo():
     print(f'foo get message')
-    return {'queue': 'end', 'result': 'lol'}
+    return {'result': 'lol'}
 
 
-@RPC('end')
+@microservice.RPC
 async def log(temp):
     print(f'log get message: {temp}')
-    return {'queue': 'end', 'error': 'kek'}
+    return {'error': 'kek'}
 
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(init_rmq(loop, 'test'))
     loop.run_forever()
