@@ -1,20 +1,20 @@
 import asyncio
 
-from aiorpc import RMQ
+from aiorpc import OGAIO_RMQ
 
-microservice = RMQ(request_queue='test', response_queue='end')
+microservice = OGAIO_RMQ(request_queue='test', response_queue='end')
 
 
 @microservice.RPC
 async def foo():
     print(f'foo get message')
-    return {'result': 'lol'}
+    return {'result': 'some result'}
 
 
 @microservice.RPC
 async def log(temp):
     print(f'log get message: {temp}')
-    return {'error': 'kek'}
+    return {'error': {'code': 32001, 'message': 'internal Error'}}
 
 
 if __name__ == '__main__':

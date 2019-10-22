@@ -8,7 +8,7 @@ from aiorpc.utils import get_logger
 logger = get_logger()
 
 
-class RMQ:
+class OGAIO_RMQ:
     def __init__(
         self,
         rmq_url='amqp://guest:guest@127.0.0.1/',
@@ -43,14 +43,30 @@ class RMQ:
 
     async def listener(self, message):
         async with message.process():
-            body = json.loads(message.body.decode())
             response_body = {'jsonrpc': '2.0'}
+            try:
+                body = json.loads(message.body.decode())
+            except json.decoder.JSONDecodeError:
+                error_msg = f'message {message.body.decode()} is not json'
+                logger.error(error_msg)
+                await self.send(
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32700}},
+                    },
+                    self.response_queue,
+                )
+                return
+
             jsonrpc_id = body.get('id')
             if not jsonrpc_id:
                 error_msg = f'message {body} don\'t have "id" field'
                 logger.error(error_msg)
                 await self.send(
-                    {**response_body, **{'error': error_msg}},
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32600}},
+                    },
                     self.response_queue,
                 )
                 return
@@ -62,7 +78,10 @@ class RMQ:
                 error_msg = f'message {body} don\'t have "method" field'
                 logger.error(error_msg)
                 await self.send(
-                    {**response_body, **{'error': error_msg}},
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32600}},
+                    },
                     self.response_queue,
                 )
                 return
@@ -73,13 +92,28 @@ class RMQ:
                 )
                 logger.error(error_msg)
                 await self.send(
-                    {**response_body, **{'error': error_msg}},
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32600}},
+                    },
                     self.response_queue,
                 )
                 return
 
             # call rpc method with params
-            method = self.rpc_methods[method_name]
+            method = self.rpc_methods.get(method_name)
+            if not method:
+                error_msg = f'message {body} method not provided'
+                logger.error(error_msg)
+                await self.send(
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32601}},
+                    },
+                    self.response_queue,
+                )
+                return
+
             params = body.get('params')
             try:
                 if isinstance(params, list):
@@ -89,7 +123,15 @@ class RMQ:
                 else:
                     response = await method()
             except Exception as e:
-                logger.error(f'message {body} raise exception {e}')
+                error_msg = f'message {body} raise exception {e}'
+                logger.error(error_msg)
+                await self.send(
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32603}},
+                    },
+                    self.response_queue,
+                )
                 return
 
             # building response json
