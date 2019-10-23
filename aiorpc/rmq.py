@@ -41,6 +41,9 @@ class OGAIO_RMQ:
             aio_pika.Message(body=json.dumps(body).encode()), routing_key=queue
         )
 
+    async def close(self):
+        await self.connection.close()
+
     async def listener(self, message):
         async with message.process():
             response_body = {'jsonrpc': '2.0'}

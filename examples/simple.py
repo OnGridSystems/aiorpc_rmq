@@ -19,4 +19,8 @@ async def log(temp):
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.run_forever()
+    try:
+    	print(vars(microservice))
+    	loop.run_forever()
+    except KeyboardInterrupt:
+    	loop.run_until_complete(microservice.close())
