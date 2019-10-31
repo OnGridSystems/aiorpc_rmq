@@ -123,10 +123,45 @@ class OGAIO_RMQ:
                     response = await method(*params)
                 elif isinstance(params, dict):
                     response = await method(**params)
-                else:
+                elif params is None:
                     response = await method()
+                else:
+                    raise TypeError(f'Invalid params {params}')
+            except AttributeError as e:
+                error_msg = f'{body} raise exception "{e}"'
+                logger.error(error_msg)
+                await self.send(
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32602}},
+                    },
+                    self.response_queue,
+                )
+                return
+            except TypeError as e:
+                error_msg = f'{body} raise exception "{e}"'
+                logger.error(error_msg)
+                await self.send(
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32602}},
+                    },
+                    self.response_queue,
+                )
+                return
+            except ValueError as e:
+                error_msg = f'{body} raise exception "{e}"'
+                logger.error(error_msg)
+                await self.send(
+                    {
+                        **response_body,
+                        **{'error': {'message': error_msg, 'code': -32602}},
+                    },
+                    self.response_queue,
+                )
+                return
             except Exception as e:
-                error_msg = f'message {body} raise exception {e}'
+                error_msg = f'{body} raise exception "{e}"'
                 logger.error(error_msg)
                 await self.send(
                     {
@@ -137,18 +172,5 @@ class OGAIO_RMQ:
                 )
                 return
 
-            # building response json
-            if response.get('result'):
-                response_body['result'] = response['result']
-            elif response.get('error'):
-                response_body['error'] = response['error']
-            else:
-                error_msg = f'message {body} RPC method return nothing'
-                logger.error(error_msg)
-                await self.send(
-                    {**response_body, **{'error': error_msg}},
-                    self.response_queue,
-                )
-                return
-
+            response_body['result'] = response
             await self.send(response_body, self.response_queue)
